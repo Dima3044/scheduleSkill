@@ -1,7 +1,22 @@
 add_activity = False
 check_plans = False
+delete_activity = False
 schedule = {}
 
+def clear_activity(r_date, r_time):
+    global schedule
+    if r_date not in schedule.keys():
+        return 'На этот день у вас нет планов'
+    else:
+        if r_time not in schedule[r_date].keys():
+            return 'У вас нет планов на это время'
+        else:
+            del schedule[r_date][r_time]
+
+            if len(schedule[r_date].keys()) == 0:
+                del schedule[r_date]
+                
+            return 'Задача удалена'
 
 def add_todo(r_date, r_time, r_todo):
     global schedule
@@ -59,7 +74,7 @@ def handler(event, context):
     :param context: information about current execution context.
     :return: response to be serialized as JSON.
     """
-    global add_activity, check_plans, schedule
+    global add_activity, check_plans, delete_activity, schedule
 
     if add_activity == True:
         for i in range(len(event['request']['nlu']['entities'])):
@@ -107,7 +122,32 @@ def handler(event, context):
                 text = watch_schedule(req_date)
                 check_plans = False
 
+    elif delete_activity == True:
+       for i in range(len(event['request']['nlu']['entities'])):
+        if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+            req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+            if len(req_month) == 1:
+                req_month = '0' + req_month
+            req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+            if len(req_day) == 1:
+                req_day = '0' + req_day
+            req_date = req_day + '.' + req_month
 
+            if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
+                req_hour = event['request']['nlu']['entities'][i]['value']['hour']
+                if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
+                    req_min = event['request']['nlu']['entities'][i]['value']['minute']
+                    req_time = str(req_hour) + ':' + str(req_min)
+                else:
+                    req_time = str(req_hour) + ':' + '00'
+
+                text = clear_activity(req_date, req_time)
+                delete_activity = False
+            else:
+                text = 'Извините, не расслышала дату'
+                delete_activity = False
+
+                    
 
     if 'добавить' in event['request']['command'] or 'добавь' in event['request']['command']:
         text = 'Укажите задачу'
@@ -116,6 +156,10 @@ def handler(event, context):
     elif 'посмотреть' in event['request']['command']:
         text = 'На какой день вы хотите посмотреть расписание?'
         check_plans = True
+
+    elif 'удалить' in event['request']['command'] or 'удали' in event['request']['command']:
+        text = 'Назовите день и время, на которые вы хотите удалить занятие'
+        delete_activity = True
         
 
     return {
