@@ -1,6 +1,8 @@
 add_activity = False
 check_plans = False
 delete_activity = False
+edit_activity = False
+edit_count = ''
 schedule = {}
 
 def clear_activity(r_date, r_time):
@@ -74,8 +76,11 @@ def handler(event, context):
     :param context: information about current execution context.
     :return: response to be serialized as JSON.
     """
-    global add_activity, check_plans, delete_activity, schedule
-
+    global add_activity, check_plans, delete_activity, edit_activity, edit_count, schedule
+    if event['request']['command'] == '':
+        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи в ваше расписание, показать их вам, а также удалять и редактировать. Чем могу быть полезна?'
+    else:
+        text = 'Жду вашей команды'
     if add_activity == True:
         for i in range(len(event['request']['nlu']['entities'])):
 
@@ -145,21 +150,89 @@ def handler(event, context):
                 delete_activity = False
             else:
                 text = 'Извините, не расслышала дату'
-                delete_activity = False
+                delete_activity = False       
 
-                    
+    elif edit_activity == True:
+        if edit_count == 0:
+            for i in range(len(event['request']['nlu']['entities'])):
 
-    if 'добавить' in event['request']['command'] or 'добавь' in event['request']['command']:
+                if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+                    req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+                    if len(req_month) == 1:
+                        req_month = '0' + req_month
+                    req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+                    if len(req_day) == 1:
+                        req_day = '0' + req_day
+                    req_date = req_day + '.' + req_month
+
+                    if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
+                        req_hour = event['request']['nlu']['entities'][i]['value']['hour']
+                        if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
+                            req_min = event['request']['nlu']['entities'][i]['value']['minute']
+                            req_time = str(req_hour) + ':' + str(req_min)
+                        else:
+                            req_time = str(req_hour) + ':' + '00'
+
+            if req_date in schedule.keys() and req_time in schedule[req_date].keys():
+                clear_activity(req_date, req_time)
+                edit_count += 1
+                text = 'Укажите занятие, дату и время'
+            else:
+                text = 'Не нашла у вас занятий на это время'
+                edit_count = ''
+                edit_activity = False
+
+        elif edit_count == 1:
+            for i in range(len(event['request']['nlu']['entities'])):
+
+                if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+                    req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+                    if len(req_month) == 1:
+                        req_month = '0' + req_month
+                    req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+                    if len(req_day) == 1:
+                        req_day = '0' + req_day
+                    req_date = req_day + '.' + req_month
+
+                    if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
+                        req_hour = event['request']['nlu']['entities'][i]['value']['hour']
+                        if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
+                            req_min = event['request']['nlu']['entities'][i]['value']['minute']
+                            req_time = str(req_hour) + ':' + str(req_min)
+                        else:
+                            req_time = str(req_hour) + ':' + '00'
+                
+                    req_todo = ''
+                    start_datetime = int(event['request']['nlu']['entities'][i]['tokens']['start'])
+                
+                    for todo in range(start_datetime):
+                        req_todo += event['request']['nlu']['tokens'][todo] + ' '
+                    if req_todo.split()[-1] == 'на' or req_todo.split()[-1] == 'в':
+                        req_todo = req_todo.split()
+                        del req_todo[-1]
+                        req_todo = ' '.join(req_todo)
+
+                    edit_activity = False
+                    edit_count = ''
+                    text = add_todo(req_date, req_time, req_todo)
+        
+
+    elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command']:
         text = 'Укажите задачу'
         add_activity = True
 
-    elif 'посмотреть' in event['request']['command']:
+    elif 'посмотреть' in event['request']['command'] or 'покажи' in event['request']['command']:
         text = 'На какой день вы хотите посмотреть расписание?'
         check_plans = True
 
     elif 'удалить' in event['request']['command'] or 'удали' in event['request']['command']:
         text = 'Назовите день и время, на которые вы хотите удалить занятие'
         delete_activity = True
+
+    elif 'редактировать' in event['request']['command'] or 'изменить' in event['request']['command']:
+        text = 'Назовите дату и время, на которые вы хотите изменять занятие' 
+        edit_count = 0
+        edit_activity = True
         
 
     return {
