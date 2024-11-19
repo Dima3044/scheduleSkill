@@ -128,29 +128,29 @@ def handler(event, context):
                 check_plans = False
 
     elif delete_activity == True:
-       for i in range(len(event['request']['nlu']['entities'])):
-        if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
-            req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
-            if len(req_month) == 1:
-                req_month = '0' + req_month
-            req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
-            if len(req_day) == 1:
-                req_day = '0' + req_day
-            req_date = req_day + '.' + req_month
+        for i in range(len(event['request']['nlu']['entities'])):
+            if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+                req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+                if len(req_month) == 1:
+                    req_month = '0' + req_month
+                req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+                if len(req_day) == 1:
+                    req_day = '0' + req_day
+                req_date = req_day + '.' + req_month
 
-            if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
-                req_hour = event['request']['nlu']['entities'][i]['value']['hour']
-                if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
-                    req_min = event['request']['nlu']['entities'][i]['value']['minute']
-                    req_time = str(req_hour) + ':' + str(req_min)
+                if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
+                    req_hour = event['request']['nlu']['entities'][i]['value']['hour']
+                    if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
+                        req_min = event['request']['nlu']['entities'][i]['value']['minute']
+                        req_time = str(req_hour) + ':' + str(req_min)
+                    else:
+                        req_time = str(req_hour) + ':' + '00'
+
+                    text = clear_activity(req_date, req_time)
+                    delete_activity = False
                 else:
-                    req_time = str(req_hour) + ':' + '00'
-
-                text = clear_activity(req_date, req_time)
-                delete_activity = False
-            else:
-                text = 'Извините, не расслышала дату'
-                delete_activity = False       
+                    text = 'Извините, не расслышала дату'
+                    delete_activity = False       
 
     elif edit_activity == True:
         if edit_count == 0:
@@ -217,7 +217,7 @@ def handler(event, context):
                     text = add_todo(req_date, req_time, req_todo)
         
 
-    elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command']:
+    elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
         text = 'Укажите задачу'
         add_activity = True
 
