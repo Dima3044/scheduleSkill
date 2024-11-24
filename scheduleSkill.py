@@ -244,6 +244,6 @@ def handler(event, context):
             'end_session': 'false'
         },
         'user_state_update':{
-            'value': event['state']['session']
+            'value': schedule
         },
     }
