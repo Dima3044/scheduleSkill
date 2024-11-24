@@ -5,6 +5,7 @@ edit_activity = False
 edit_count = ''
 schedule = {}
 
+
 def clear_activity(r_date, r_time):
     global schedule
     if r_date not in schedule.keys():
@@ -77,6 +78,8 @@ def handler(event, context):
     :return: response to be serialized as JSON.
     """
     global add_activity, check_plans, delete_activity, edit_activity, edit_count, schedule
+    if 'value' in event['state']['user'].keys():
+        schedule = event['state']['user']['value']
     if event['request']['command'] == '':
         text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи в ваше расписание, показать их вам, а также удалять и редактировать. Чем могу быть полезна?'
     else:
@@ -241,9 +244,9 @@ def handler(event, context):
         'response': {
             'text': text,
             # Don't finish the session after this response.
-            'end_session': 'false'
+            'end_session': 'false',
         },
         'user_state_update':{
             'value': schedule
-        },
+        }
     }
