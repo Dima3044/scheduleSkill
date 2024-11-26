@@ -185,9 +185,16 @@ def handler(event, context):
             req_time = get_time(event, context)
             req_todo = get_todo(event, context)
 
-            edit_activity = False
-            edit_count = ''
-            text = add_todo(req_date, req_time, req_todo)
+            if req_date == 404:
+                text = 'Не могу распознать дату. Повторите запрос, пожалуйста.'
+            elif req_time == 404:
+                text = 'Не могу распознать время. Повторите запрос, пожалуйста.'
+            elif req_todo == 404:
+                text = 'Не могу распознать занятие. Повторите запрос, пожалуйста.'
+            else:
+                edit_activity = False
+                edit_count = ''
+                text = add_todo(req_date, req_time, req_todo)
         
 
     elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
@@ -203,7 +210,7 @@ def handler(event, context):
         delete_activity = True
 
     elif 'редактировать' in event['request']['command'] or 'изменить' in event['request']['command']:
-        text = 'Назовите дату и время, на которые вы хотите изменять занятие' 
+        text = 'Назовите дату и время, на которые вы хотите изменить занятие' 
         edit_count = 0
         edit_activity = True
         
