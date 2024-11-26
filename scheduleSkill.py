@@ -216,6 +216,7 @@ def handler(event, context):
         
     elif 'очистить расписание' in event['request']['command']:
         schedule.clear()
+        text = 'Расписание очищено!'
         
 
     return {
