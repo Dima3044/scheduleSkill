@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta
+import pytz
+
+
 add_activity = False
 check_plans = False
 delete_activity = False
@@ -7,16 +11,31 @@ schedule = {}
 
 def get_date(event, context):
     req_date = ''
-    for i in range(len(event['request']['nlu']['entities'])):
 
-        if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
-            req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
-            if len(req_month) == 1:
-                req_month = '0' + req_month
-            req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
-            if len(req_day) == 1:
-                req_day = '0' + req_day
-            req_date = req_day + '.' + req_month
+    if 'сегодня' in event['request']['command']:
+        user_timezone = pytz.timezone(event['meta']['timezone'])
+        req_date = datetime.now(user_timezone).strftime('%d.%m')
+
+    elif 'послезавтра' in event['request']['command']:
+        user_timezone = pytz.timezone(event['meta']['timezone'])
+        correction = timedelta(days = 2)
+        req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')
+    
+    elif 'завтра' in event['request']['command']:
+        user_timezone = pytz.timezone(event['meta']['timezone'])
+        correction = timedelta(days = 1)
+        req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')     
+
+    else:   
+        for i in range(len(event['request']['nlu']['entities'])):
+            if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+                req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+                if len(req_month) == 1:
+                    req_month = '0' + req_month
+                req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+                if len(req_day) == 1:
+                    req_day = '0' + req_day
+                req_date = req_day + '.' + req_month
             
     if req_date == '':
         return 404
@@ -119,7 +138,7 @@ def watch_schedule(r_date):
             res_time = h + ':' + mins
 
             add_plan = res_time + ' ' + schedule[r_date][res_time]
-            plans += add_plan + '|'
+            plans += add_plan + ' | '
             
         return plans
 
@@ -140,6 +159,7 @@ def handler(event, context):
         text = 'Жду вашей команды'
         
     if add_activity == True:
+
         req_date = get_date(event, context)
         req_time = get_time(event, context)
         req_todo = get_todo(event, context)
