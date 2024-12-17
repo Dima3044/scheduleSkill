@@ -1,5 +1,3 @@
-ls = [1]
+sre = 'tvwe'
 
-list.append(ls, 2)
-
-print(len(ls))
+print(type(int(sre)))
