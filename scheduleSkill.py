@@ -11,41 +11,31 @@ schedule = {}
 
 def get_date(event, context):
     req_date = ''
+    for i in range(len(event['request']['nlu']['entities'])):
+        if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+            if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
+                user_timezone = pytz.timezone(event['meta']['timezone'])
+                days_delta = event['request']['nlu']['entities'][i]['value']['day']
+                correction = timedelta(days = days_delta)
+                req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')  
+                return req_date   
 
-    if 'сегодня' in event['request']['command']:
-        user_timezone = pytz.timezone(event['meta']['timezone'])
-        req_date = datetime.now(user_timezone).strftime('%d.%m')
-        return req_date
-        
-    elif 'послезавтра' in event['request']['command']:
-        user_timezone = pytz.timezone(event['meta']['timezone'])
-        correction = timedelta(days = 2)
-        req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')
-        return req_date
-    
-    elif 'завтра' in event['request']['command']:
-        user_timezone = pytz.timezone(event['meta']['timezone'])
-        correction = timedelta(days = 1)
-        req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')  
-        return req_date   
+            elif 'month' in event['request']['nlu']['entities'][i]['value'].keys():
+                req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
+                if len(req_month) == 1:
+                    req_month = '0' + req_month
+                if 'day' in event['request']['nlu']['entities'][i]['value'].keys():
+                    req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
+                else:
+                    day_index = event['request']['nlu']['entities'][i]['tokens']['start'] - 2
+                    req_day = str(event['request']['nlu']['tokens'][day_index])
 
-    else:   
-        for i in range(len(event['request']['nlu']['entities'])):
-            if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
-                if 'month' in event['request']['nlu']['entities'][i]['value'].keys():
-                    req_month = str(event['request']['nlu']['entities'][i]['value']['month'])
-                    if len(req_month) == 1:
-                        req_month = '0' + req_month
-                    if 'day' in event['request']['nlu']['entities'][i]['value'].keys():
-                        req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
-                    else:
-                        day_index = event['request']['nlu']['entities'][i]['tokens']['start'] - 2
-                        req_day = str(event['request']['nlu']['tokens'][day_index])
-
-                    if len(req_day) == 1:
-                        req_day = '0' + req_day
-                    req_date = req_day + '.' + str(req_month)
-                    return req_date
+                if len(req_day) == 1:
+                    req_day = '0' + req_day
+                req_date = req_day + '.' + str(req_month)
+                return req_date
+            else:
+                return 404
 
 
 def get_time(event, context):
@@ -245,9 +235,6 @@ def handler(event, context):
     elif 'очистить расписание' in event['request']['command']:
         schedule.clear()
         text = 'Расписание очищено!'
-    
-    elif 'проверка' in event['request']['command']:
-        text = event['request']['nlu']['tokens'][0]
 
     return {
         'version': event['version'],
