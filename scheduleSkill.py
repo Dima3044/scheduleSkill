@@ -73,23 +73,19 @@ def get_time(event, context):
 
 def get_todo(event, context):
     req_todo = ''
+    
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
-
-            start_datetime = int(event['request']['nlu']['entities'][i]['tokens']['start'])
-        
-            for todo in range(start_datetime):
-                req_todo += event['request']['nlu']['tokens'][todo] + ' '
-                
-            if req_todo.split()[-1] == 'на' or req_todo.split()[-1] == 'в':
-                req_todo = req_todo.split()
-                del req_todo[-1]
-                req_todo = ' '.join(req_todo)
-    if req_todo == '':
-        return 404
-    else:
-        return req_todo
-
+            if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
+                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 1
+            elif 'month' in event['request']['nlu']['entities'][i]['value'].keys():
+                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 2
+            else:
+                continue
+            for k in range(start_datetime):
+                req_todo += event['request']['original_utterance'].split(' ')[k] + ' '
+            del req_todo.split(' ')[-1]
+            return req_todo
 
 def clear_activity(r_date, r_time):
     global schedule
