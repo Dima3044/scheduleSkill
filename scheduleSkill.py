@@ -45,19 +45,26 @@ def get_date(event, context):
 
 def get_time(event, context):
     req_time = ''
+    time_period_index = []
+
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
             if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
-                req_hour = event['request']['nlu']['entities'][i]['value']['hour']
-                if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():                   
-                    req_min = event['request']['nlu']['entities'][i]['value']['minute']
-                    req_time = str(req_hour) + ':' + str(req_min)
-                else:
-                    req_time = str(req_hour) + ':' + '00'
-    if req_time == '':
-        return 404
+                list.append(time_period_index, i)
+
+    time_period_start = str(event['request']['nlu']['entities'][time_period_index[0]]['value']['hour'])
+    if 'minute' in event['request']['nlu']['entities'][time_period_index[0]]['value']:
+        time_period_start += ':' + str(event['request']['nlu']['entities'][time_period_index[0]]['value']['minute'])
     else:
-        return req_time
+        time_period_start += ':00'
+
+    time_period_end = str(event['request']['nlu']['entities'][time_period_index[1]]['value']['hour'])
+    if 'minute' in event['request']['nlu']['entities'][time_period_index[1]]['value']:
+        time_period_end += ':' + str(event['request']['nlu']['entities'][time_period_index[1]]['value']['minute'])
+    else:
+        time_period_end += ':00'
+
+    return time_period_start + ' - ' + time_period_end
 
 def get_todo(event, context):
     req_todo = ''
