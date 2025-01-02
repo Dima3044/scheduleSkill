@@ -94,7 +94,8 @@ def clear_activity(r_date, r_time):
 
 def add_todo(r_date, r_time, r_todo):
     global schedule
-
+    r_todo = ' - ' + r_time.split(' - ')[1] + ' ' + r_todo
+    r_time = r_time.split(' - ')[0]
     if r_date not in schedule.keys():
         schedule[r_date] = {}
         schedule[r_date][r_time] = r_todo
@@ -112,31 +113,23 @@ def watch_schedule(r_date):
     if r_date not in schedule.keys():
         return 'На этот день у вас ещё нет планов'
     else:
-        plans = 'Ваши планы на ' + str(r_date) + ': |'
+        plans = 'Ваши планы на ' + str(r_date) + ': \n '
         time_to_mins = []
-
         for time in schedule[r_date]:
             mins = time.split(':')
-
             mins_amount = int(mins[0]) * 60 + int(mins[1])
-
             time_to_mins.append(mins_amount)
-    
         list.sort(time_to_mins)
-
         for mins in time_to_mins:
             h = (mins - mins % 60) // 60
             mins = mins - h * 60
             h = str(h)
-
             mins = str(mins)
             if len(mins) == 1:
                 mins = '0' + mins
-
             res_time = h + ':' + mins
-
             add_plan = res_time + ' ' + schedule[r_date][res_time]
-            plans += add_plan + ' | '
+            plans += add_plan + ' |\n '
             
         return plans
 
