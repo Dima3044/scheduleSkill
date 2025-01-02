@@ -40,6 +40,19 @@ def get_date(event, context):
 
 def get_time(event, context):
     req_time = ''
+    for i in range(len(event['request']['nlu']['entities'])):
+        if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
+            hour = str(event['request']['nlu']['entities'][i]['value']['hour'])
+            if 'minute' in event['request']['nlu']['entities'][i]['value'].keys():
+                minute = str(event['request']['nlu']['entities'][i]['value']['minute'])
+                if len(minute) == 1:
+                    minute = '0' + minute
+            else:
+                minute = '00'
+    req_time = hour + ':' + minute
+    return req_time
+
+def get_timeperiod(event, context):
     time_period_index = []
 
     for i in range(len(event['request']['nlu']['entities'])):
@@ -111,7 +124,7 @@ def watch_schedule(r_date):
     global schedule
 
     if r_date not in schedule.keys():
-        return 'На этот день у вас ещё нет планов'
+        return 'На этот день у Вас ещё нет планов'
     else:
         plans = 'Ваши планы на ' + str(r_date) + ': \n '
         time_to_mins = []
@@ -145,14 +158,15 @@ def handler(event, context):
     if 'value' in event['state']['user'].keys():
         schedule = event['state']['user']['value']
     if event['request']['command'] == '':
-        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи в ваше расписание, показать их вам, а также удалять и редактировать. Чем могу быть полезна?'
+        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи в Ваше расписание, показать их Вам,\
+        а также удалять и редактировать. Чем могу быть полезна?'
     else:
-        text = 'Жду вашей команды'
+        text = 'Жду Вашей команды'
         
     if add_activity == True:
 
         req_date = get_date(event, context)
-        req_time = get_time(event, context)
+        req_time = get_timeperiod(event, context)
         req_todo = get_todo(event, context)
 
         if req_date == 404:
@@ -187,7 +201,7 @@ def handler(event, context):
                 edit_count += 1
                 text = 'Укажите занятие, дату и время'
             else:
-                text = 'Не нашла у вас занятий на это время'
+                text = 'Не нашла у Вас занятий на это время'
                 edit_count = ''
                 edit_activity = False
 
@@ -213,15 +227,15 @@ def handler(event, context):
         add_activity = True
 
     elif 'посмотреть' in event['request']['command'] or 'покажи' in event['request']['command']:
-        text = 'На какой день вы хотите посмотреть расписание?'
+        text = 'На какой день Вы хотите посмотреть расписание?'
         check_plans = True
 
     elif 'удалить' in event['request']['command'] or 'удали' in event['request']['command']:
-        text = 'Назовите день и время, на которые вы хотите удалить занятие'
+        text = 'Назовите день и время, на которые Вы хотите удалить занятие'
         delete_activity = True
 
     elif 'редактировать' in event['request']['command'] or 'изменить' in event['request']['command']:
-        text = 'Назовите дату и время, на которые вы хотите изменить занятие' 
+        text = 'Назовите дату и время, на которые Вы хотите изменить занятие' 
         edit_count = 0
         edit_activity = True
         
