@@ -9,6 +9,12 @@ edit_activity = False
 edit_count = ''
 schedule = {}
 
+def convert_to_mins(time_moment):
+    hours = int(time_moment.split(':')[0])
+    minutes = int(time_moment.split(':')[1])
+    converted = hours * 60 + minutes
+    return converted
+
 def get_date(event, context):
     req_date = ''
     for i in range(len(event['request']['nlu']['entities'])):
@@ -27,15 +33,17 @@ def get_date(event, context):
                 if 'day' in event['request']['nlu']['entities'][i]['value'].keys():
                     req_day = str(event['request']['nlu']['entities'][i]['value']['day'])
                 else:
-                    day_index = event['request']['nlu']['entities'][i]['tokens']['start'] - 2
-                    req_day = str(event['request']['nlu']['tokens'][day_index])
+                    if event['request']['nlu']['entities'][i-1]['type'] == 'YANDEX.NUMBER':
+                        req_day = str(event['request']['nlu']['entities'][i-1]['value'])
+                    else:
+                        return 404
 
                 if len(req_day) == 1:
                     req_day = '0' + req_day
-                req_date = req_day + '.' + str(req_month)
+                req_date = str(req_day) + '.' + str(req_month)
                 return req_date
-            else:
-                return 404
+    if req_date == '':
+        return 404
 
 
 def get_time(event, context):
@@ -80,14 +88,13 @@ def get_todo(event, context):
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
             if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
-                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 1
+                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
             elif 'month' in event['request']['nlu']['entities'][i]['value'].keys():
-                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 2
+                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
             else:
                 continue
             for k in range(start_datetime):
                 req_todo += event['request']['original_utterance'].split(' ')[k] + ' '
-            del req_todo.split(' ')[-1]
             return req_todo
 
 def clear_activity(r_date, r_time):
@@ -107,18 +114,41 @@ def clear_activity(r_date, r_time):
 
 def add_todo(r_date, r_time, r_todo):
     global schedule
-    r_todo = ' - ' + r_time.split(' - ')[1] + ' ' + r_todo
-    r_time = r_time.split(' - ')[0]
+    period_start = r_time.split(' - ')[0]
+    period_end = r_time.split(' - ')[1]
+    
+    if int(period_end.split(':')[0]) < int(period_start.split(':')[0]):
+        return 'Время конца занятия должно быть больше, чем время начала'
+    elif int(period_end.split(':')[0]) == int(period_start.split(':')[0]):
+        if int(period_end.split(':')[1]) < int(period_start.split(':')[1]):
+            return 'Время конца занятия должно быть больше, чем время начала'
+
+    r_todo = '-' + period_end + ' ' + r_todo
+    r_time = period_start
     if r_date not in schedule.keys():
         schedule[r_date] = {}
         schedule[r_date][r_time] = r_todo
         return 'Задача добавлена'
     else:
-        if r_time in schedule[r_date].keys():
-            return 'Это время уже занято'
-        else:
-            schedule[r_date][r_time] = r_todo 
-            return 'Задача добавлена'
+        mins_in_period = []
+        start_time = convert_to_mins(period_start)
+        end_time = convert_to_mins(period_end)
+        for minute in range(start_time, end_time):
+            mins_in_period.append(minute)
+
+        for todo_start in schedule[r_date]:
+            booked_mins = []
+            todo_end = schedule[r_date][todo_start].split(' ')[0]
+            todo_end = str.strip(todo_end, '-')
+            todo_start_in_min = convert_to_mins(todo_start)
+            todo_end_in_min = convert_to_mins(todo_end)
+            for booked in range(todo_start_in_min, todo_end_in_min):
+                booked_mins.append(booked)
+            if (len(mins_in_period) + len(booked_mins)) != len(set(mins_in_period + booked_mins)):
+                return f'Пересечение. {r_date} у вас есть планы \
+            {todo_start}{schedule[r_date][todo_start]}'
+        schedule[r_date][r_time] = r_todo
+        return 'Задача добавлена'
 
 def watch_schedule(r_date):
     global schedule
@@ -129,8 +159,7 @@ def watch_schedule(r_date):
         plans = 'Ваши планы на ' + str(r_date) + ': \n '
         time_to_mins = []
         for time in schedule[r_date]:
-            mins = time.split(':')
-            mins_amount = int(mins[0]) * 60 + int(mins[1])
+            mins_amount = convert_to_mins(time)
             time_to_mins.append(mins_amount)
         list.sort(time_to_mins)
         for mins in time_to_mins:
@@ -141,7 +170,7 @@ def watch_schedule(r_date):
             if len(mins) == 1:
                 mins = '0' + mins
             res_time = h + ':' + mins
-            add_plan = res_time + ' ' + schedule[r_date][res_time]
+            add_plan = res_time + schedule[r_date][res_time]
             plans += add_plan + ' |\n '
             
         return plans
@@ -207,19 +236,19 @@ def handler(event, context):
 
         elif edit_count == 1:
             req_date = get_date(event, context)
-            req_time = get_time(event, context)
+            req_timeperiod = get_timeperiod(event, context)
             req_todo = get_todo(event, context)
 
             if req_date == 404:
                 text = 'Не могу распознать дату. Повторите запрос, пожалуйста.'
-            elif req_time == 404:
+            elif req_timeperiod == 404:
                 text = 'Не могу распознать время. Повторите запрос, пожалуйста.'
             elif req_todo == 404:
                 text = 'Не могу распознать занятие. Повторите запрос, пожалуйста.'
             else:
                 edit_activity = False
                 edit_count = ''
-                text = add_todo(req_date, req_time, req_todo)
+                text = add_todo(req_date, req_timeperiod, req_todo)
         
 
     elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
@@ -242,6 +271,7 @@ def handler(event, context):
     elif 'очистить расписание' in event['request']['command']:
         schedule.clear()
         text = 'Расписание очищено!'
+
 
     return {
         'version': event['version'],
