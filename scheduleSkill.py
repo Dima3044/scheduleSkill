@@ -1,13 +1,51 @@
 from datetime import datetime, timedelta
 import pytz
 
-
+delete_note = False
+note_date = ''
+add_note = False
 add_activity = False
 check_plans = False
 delete_activity = False
 edit_activity = False
 edit_count = ''
 schedule = {}
+notes = {}
+
+def clear_note(event, context):
+    global note_date, notes
+    event_len = len(event['request']['nlu']['entities'])
+    if event_len == 0:
+        return 'Не расслышала номер заметки'
+        
+    for entity in range(event_len):
+        if event['request']['nlu']['entities'][entity]['type'] == 'YANDEX.NUMBER':
+            note_number = str(event['request']['nlu']['entities'][entity]['value'])
+    if note_number in notes[note_date].keys():
+        del notes[note_date][note_number]
+        if len(notes[note_date]) == 0:
+            del notes[note_date]
+        return f'Заметка номер {note_number} на {note_date} удалена!'
+    else:
+        return f'У Вас нет заметки номер {note_number} на {note_date}'
+
+
+
+def create_note(event, context):
+    global notes, note_date
+    if note_date not in notes.keys():
+        notes[note_date] = {}
+        note_number = 1
+    else:
+        for k in range(1, len(notes[note_date]) + 1):
+            if str(k) not in notes[note_date].keys():
+                note_number = k
+                break
+            else:
+                note_number = k + 1
+    
+    notes[note_date][note_number] = event['request']['original_utterance']
+    return f'Заметка номер {note_number} на {note_date} добавлена'
 
 def convert_to_mins(time_moment):
     hours = int(time_moment.split(':')[0])
@@ -88,13 +126,15 @@ def get_todo(event, context):
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
             if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
-                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
+                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 1
             elif 'month' in event['request']['nlu']['entities'][i]['value'].keys():
                 start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
             else:
                 continue
             for k in range(start_datetime):
                 req_todo += event['request']['original_utterance'].split(' ')[k] + ' '
+            if start_datetime == 0:
+                req_todo = event['request']['nlu']['tokens'][0]
             return req_todo
 
 def clear_activity(r_date, r_time):
@@ -183,7 +223,9 @@ def handler(event, context):
     :param context: information about current execution context.
     :return: response to be serialized as JSON.
     """
-    global add_activity, check_plans, delete_activity, edit_activity, edit_count, schedule
+    global add_activity, check_plans, delete_activity, edit_activity, edit_count, schedule, notes, add_note, note_date, delete_note
+    if 'notes' in event['state']['user'].keys():
+        notes = event['state']['user']['notes']
     if 'value' in event['state']['user'].keys():
         schedule = event['state']['user']['value']
     if event['request']['command'] == '':
@@ -219,6 +261,14 @@ def handler(event, context):
         text = clear_activity(req_date, req_time)
         delete_activity = False
 
+    elif add_note == True:
+        text = create_note(event, context)
+        add_note = False
+
+    elif delete_note == True:
+        text = clear_note(event, context)
+        delete_note = False
+
 
     elif edit_activity == True:
         if edit_count == 0:
@@ -249,7 +299,25 @@ def handler(event, context):
                 edit_activity = False
                 edit_count = ''
                 text = add_todo(req_date, req_timeperiod, req_todo)
+
+    elif 'удалить заметку' in event['request']['command']:
+        note_date = get_date(event, context)
         
+        if note_date not in notes.keys():
+            text = f'У Вас нет заметок на {note_date}'
+        elif note_date == 404:
+            text = 'Не расслышала дату'
+        else: 
+            text = 'Назовите номер заметки'
+            delete_note = True
+
+    elif 'сделать заметку' in event['request']['command'] or 'создать заметку' in event['request']['command']:
+        text = 'Назовите содержимое заметки'
+        note_date = get_date(event, context)
+        if note_date != 404:
+            add_note = True
+        else:
+            text = 'Не расслышала, на какой день Вы хотите добавить заметку'
 
     elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
         text = 'Укажите задачу'
@@ -272,6 +340,12 @@ def handler(event, context):
         schedule.clear()
         text = 'Расписание очищено!'
 
+    elif 'пояс' in event['request']['command']:
+        user_timezone = pytz.timezone(event['meta']['timezone'])
+        text = datetime.now(user_timezone) 
+
+    elif 'тест' in event['request']['command']:
+        text = notes['04.01']['1']
 
     return {
         'version': event['version'],
@@ -282,6 +356,7 @@ def handler(event, context):
             'end_session': 'false',
         },
         'user_state_update':{
-            'value': schedule
+            'value': schedule,
+            'notes': notes
         }
     }
