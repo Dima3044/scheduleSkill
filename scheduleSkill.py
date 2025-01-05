@@ -1,19 +1,19 @@
 from datetime import datetime, timedelta
 import pytz
 
+add_date = ''
 delete_note = False
 note_date = ''
 add_note = False
 add_activity = False
-check_plans = False
 delete_activity = False
 edit_activity = False
 edit_count = ''
 schedule = {}
 notes = {}
 
-#удаление заметки
-def clear_note(event, context):
+
+def clear_note(event, context):  # удаление заметки
     global note_date, notes
     event_len = len(event['request']['nlu']['entities'])
     if event_len == 0:
@@ -29,16 +29,16 @@ def clear_note(event, context):
     else:
         return f'У Вас нет заметки номер {note_number} на {note_date}'
 
-#просмотр заметок
-def watch_notes(req_date):
+
+def watch_notes(req_date):  # просмотр заметок
     global notes
     text = 'Ваши заметки: \n'
     for note_number in notes[req_date]:
         text += f'№{note_number}: {notes[req_date][note_number]} |\n'
     return text
 
-#создать заметку
-def create_note(event, context):
+
+def create_note(event, context):  # создать заметку
     global notes, note_date
     if note_date not in notes.keys():
         notes[note_date] = {}
@@ -54,7 +54,7 @@ def create_note(event, context):
     return f'Заметка номер {note_number} на {note_date} добавлена'
 
 
-def clear_activity(r_date, r_time):
+def clear_activity(r_date, r_time):  # удалить задачу
     global schedule
     if r_date not in schedule.keys():
         return 'На этот день у вас нет планов'
@@ -69,7 +69,7 @@ def clear_activity(r_date, r_time):
             return 'Задача удалена'
 
 
-def add_todo(r_date, r_time, r_todo):
+def add_todo(r_date, r_time, r_todo):  # добавить задачу
     global schedule
     period_start = r_time.split(' - ')[0]
     period_end = r_time.split(' - ')[1]
@@ -107,10 +107,11 @@ def add_todo(r_date, r_time, r_todo):
         return 'Задача добавлена'
 
 
-def watch_schedule(r_date):
+def watch_schedule(r_date):  # посмотреть расписание
     global schedule, notes
-
-    if r_date not in schedule.keys():
+    if r_date == 'Не расслышала дату':
+        return 'Извините, не расслышала дату'
+    elif r_date not in schedule.keys():
         return 'На этот день у Вас ещё нет планов'
     else:
         plans = 'Ваши планы на ' + str(r_date) + ': \n '
@@ -140,7 +141,7 @@ def convert_to_mins(time_moment):
     return converted
 
 
-def get_date(event, context):
+def get_date(event, context):  # найти дату в запросе
     req_date = ''
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
@@ -161,17 +162,17 @@ def get_date(event, context):
                     if event['request']['nlu']['entities'][i-1]['type'] == 'YANDEX.NUMBER':
                         req_day = str(event['request']['nlu']['entities'][i-1]['value'])
                     else:
-                        return 404
+                        return 'Не расслышала дату'
 
                 if len(req_day) == 1:
                     req_day = '0' + req_day
                 req_date = str(req_day) + '.' + str(req_month)
                 return req_date
     if req_date == '':
-        return 404
+        return 'Не расслышала дату'
 
 
-def get_time(event, context):
+def get_time(event, context):  # найти конкретное время в запросе
     req_time = ''
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
@@ -183,17 +184,20 @@ def get_time(event, context):
             else:
                 minute = '00'
     req_time = hour + ':' + minute
+    if req_time == '':
+        req_time = 'Не расслышала время'
     return req_time
 
 
-def get_timeperiod(event, context):
+def get_timeperiod(event, context):  # найти временной промежуток в запросе
     time_period_index = []
 
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
             if 'hour' in event['request']['nlu']['entities'][i]['value'].keys():
                 list.append(time_period_index, i)
-
+    if len(time_period_index) == 0:
+        return 'Не расслышала время'
     time_period_start = str(event['request']['nlu']['entities'][time_period_index[0]]['value']['hour'])
     if 'minute' in event['request']['nlu']['entities'][time_period_index[0]]['value']:
         time_period_start += ':' + str(event['request']['nlu']['entities'][time_period_index[0]]['value']['minute'])
@@ -209,62 +213,46 @@ def get_timeperiod(event, context):
     return time_period_start + ' - ' + time_period_end
 
 
-def get_todo(event, context):
+def get_todo(event, context):  # найти занятие в запросе
     req_todo = ''
     
     for i in range(len(event['request']['nlu']['entities'])):
         if event['request']['nlu']['entities'][i]['type'] == 'YANDEX.DATETIME':
-            if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
-                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start'] - 1
-            elif 'month' in event['request']['nlu']['entities'][i]['value'].keys():
-                start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
-            else:
-                continue
+            start_datetime = event['request']['nlu']['entities'][i]['tokens']['start']
             for k in range(start_datetime):
-                req_todo += event['request']['original_utterance'].split(' ')[k] + ' '
-            if start_datetime == 0:
+                if k == (start_datetime-1) and event['request']['nlu']['tokens'][k] == 'с':
+                    continue
+                req_todo += event['request']['nlu']['tokens'][k] + ' '
+            if start_datetime == 1:
                 req_todo = event['request']['nlu']['tokens'][0]
             return req_todo
 
 
 def handler(event, context):
-    """
-    Entry-point for Serverless Function.
-    :param event: request payload.
-    :param context: information about current execution context.
-    :return: response to be serialized as JSON.
-    """
-    global add_activity, check_plans, delete_activity, edit_activity, edit_count, schedule, notes, add_note, note_date, delete_note
+    global add_activity, delete_activity, edit_activity, edit_count, schedule
+    global notes, add_note, note_date, delete_note, add_date
     if 'notes' in event['state']['user'].keys():
         notes = event['state']['user']['notes']
     if 'value' in event['state']['user'].keys():
         schedule = event['state']['user']['value']
     if event['request']['command'] == '':
-        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи в Ваше расписание, показать их Вам,\
+        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи \
+        в Ваше расписание, показать их Вам,\
         а также удалять и редактировать. Чем могу быть полезна?'
     else:
         text = 'Жду Вашей команды'
         
     if add_activity == True:
-
-        req_date = get_date(event, context)
         req_time = get_timeperiod(event, context)
         req_todo = get_todo(event, context)
-
-        if req_date == 404:
-            text = 'Не смогла распознать дату'
-        elif req_time == 404:
-            text = 'Не смогла распознать время'
-        elif req_todo == 404:
-            text = 'Не смогла распознать занятие'
+        if add_date == 'Не расслышала дату':
+            text = add_date
+        elif req_time == 'Не расслышала время':
+            text = req_time
         else:
             add_activity = False
-            text = add_todo(req_date, req_time, req_todo)
+            text = add_todo(add_date, req_time, req_todo)
 
-    elif check_plans == True:
-        req_date = get_date(event, context)
-        text = watch_schedule(req_date)
-        check_plans = False
 
     elif delete_activity == True:
         req_date = get_date(event, context)
@@ -283,33 +271,27 @@ def handler(event, context):
 
     elif edit_activity == True:
         if edit_count == 0:
-            req_date = get_date(event, context)
+            add_date = get_date(event, context)
             req_time = get_time(event, context)
-
-            if req_date in schedule.keys() and req_time in schedule[req_date].keys():
-                clear_activity(req_date, req_time)
+            text = add_date + req_time
+            if add_date in schedule.keys() and req_time in schedule[add_date].keys():
+                clear_activity(add_date, req_time)
                 edit_count += 1
-                text = 'Укажите занятие, дату и время'
+                text = 'Укажите новые занятие и время'
             else:
                 text = 'Не нашла у Вас занятий на это время'
                 edit_count = ''
                 edit_activity = False
 
         elif edit_count == 1:
-            req_date = get_date(event, context)
             req_timeperiod = get_timeperiod(event, context)
             req_todo = get_todo(event, context)
-
-            if req_date == 404:
-                text = 'Не могу распознать дату. Повторите запрос, пожалуйста.'
-            elif req_timeperiod == 404:
-                text = 'Не могу распознать время. Повторите запрос, пожалуйста.'
-            elif req_todo == 404:
-                text = 'Не могу распознать занятие. Повторите запрос, пожалуйста.'
+            if req_timeperiod == 'Не расслышала время':
+                text = req_timeperiod
             else:
                 edit_activity = False
                 edit_count = ''
-                text = add_todo(req_date, req_timeperiod, req_todo)
+                text = add_todo(add_date, req_timeperiod, req_todo)
 
     elif 'посмотреть заметки' in event['request']['command']:
         note_date = get_date(event, context)
@@ -317,29 +299,35 @@ def handler(event, context):
 
     elif 'удалить заметку' in event['request']['command']:
         note_date = get_date(event, context)
+        
         if note_date not in notes.keys():
             text = f'У Вас нет заметок на {note_date}'
-        elif note_date == 404:
-            text = 'Не расслышала дату'
-        else:
+        elif note_date == 'Не расслышала дату':
+            text = note_date
+        else: 
             text = 'Назовите номер заметки'
             delete_note = True
 
     elif 'сделать заметку' in event['request']['command'] or 'создать заметку' in event['request']['command']:
         text = 'Назовите содержимое заметки'
         note_date = get_date(event, context)
-        if note_date != 404:
+        if note_date != 'Не расслышала дату':
             add_note = True
         else:
             text = 'Не расслышала, на какой день Вы хотите добавить заметку'
 
     elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
-        text = 'Укажите задачу'
-        add_activity = True
+        add_date = get_date(event, context)
+        if add_date == 'Не расслышала дату':
+            text = add_date
+        else:
+            text = 'Укажите задачу и временной промежуток'
+            add_activity = True
 
     elif 'посмотреть расписание' in event['request']['command'] or 'покажи' in event['request']['command']:
-        text = 'На какой день Вы хотите посмотреть расписание?'
-        check_plans = True
+        req_date = get_date(event, context)
+        text = watch_schedule(req_date)
+
 
     elif 'удалить' in event['request']['command'] or 'удали' in event['request']['command']:
         text = 'Назовите день и время, на которые Вы хотите удалить занятие'
@@ -350,27 +338,12 @@ def handler(event, context):
         edit_count = 0
         edit_activity = True
 
-    elif 'очистить расписание' in event['request']['command']:
-        schedule.clear()
-        text = 'Расписание очищено!'
-
-    elif 'очистить заметки' in event['request']['command']:
-        notes.clear()
-        text = 'Заметки очищены!'
-
-    elif 'пояс' in event['request']['command']:
-        user_timezone = pytz.timezone(event['meta']['timezone'])
-        text = datetime.now(user_timezone) 
-
-    elif 'тест' in event['request']['command']:
-        text = watch_notes(notes, '04.01')
 
     return {
         'version': event['version'],
         'session': event['session'],
         'response': {
             'text': text,
-            # Don't finish the session after this response.
             'end_session': 'false',
         },
         'user_state_update':{
