@@ -12,12 +12,12 @@ edit_count = ''
 schedule = {}
 notes = {}
 
+#удаление заметки
 def clear_note(event, context):
     global note_date, notes
     event_len = len(event['request']['nlu']['entities'])
     if event_len == 0:
         return 'Не расслышала номер заметки'
-        
     for entity in range(event_len):
         if event['request']['nlu']['entities'][entity]['type'] == 'YANDEX.NUMBER':
             note_number = str(event['request']['nlu']['entities'][entity]['value'])
@@ -29,8 +29,15 @@ def clear_note(event, context):
     else:
         return f'У Вас нет заметки номер {note_number} на {note_date}'
 
+#просмотр заметок
+def watch_notes(req_date):
+    global notes
+    text = 'Ваши заметки: \n'
+    for note_number in notes[req_date]:
+        text += f'№{note_number}: {notes[req_date][note_number]} |\n'
+    return text
 
-
+#создать заметку
 def create_note(event, context):
     global notes, note_date
     if note_date not in notes.keys():
@@ -43,15 +50,95 @@ def create_note(event, context):
                 break
             else:
                 note_number = k + 1
-    
     notes[note_date][note_number] = event['request']['original_utterance']
     return f'Заметка номер {note_number} на {note_date} добавлена'
+
+
+def clear_activity(r_date, r_time):
+    global schedule
+    if r_date not in schedule.keys():
+        return 'На этот день у вас нет планов'
+    else:
+        if r_time not in schedule[r_date].keys():
+            return 'У вас нет планов на это время'
+        else:
+            del schedule[r_date][r_time]
+
+            if len(schedule[r_date].keys()) == 0:
+                del schedule[r_date]
+            return 'Задача удалена'
+
+
+def add_todo(r_date, r_time, r_todo):
+    global schedule
+    period_start = r_time.split(' - ')[0]
+    period_end = r_time.split(' - ')[1]
+    if int(period_end.split(':')[0]) < int(period_start.split(':')[0]):
+        return 'Время конца занятия должно быть больше, чем время начала'
+    elif int(period_end.split(':')[0]) == int(period_start.split(':')[0]):
+        if int(period_end.split(':')[1]) < int(period_start.split(':')[1]):
+            return 'Время конца занятия должно быть больше, чем время начала'
+
+    r_todo = '-' + period_end + ' ' + r_todo
+    r_time = period_start
+    if r_date not in schedule.keys():
+        schedule[r_date] = {}
+        schedule[r_date][r_time] = r_todo
+        return 'Задача добавлена'
+    else:
+        mins_in_period = []
+        start_time = convert_to_mins(period_start)
+        end_time = convert_to_mins(period_end)
+        for minute in range(start_time, end_time):
+            mins_in_period.append(minute)
+
+        for todo_start in schedule[r_date]:
+            booked_mins = []
+            todo_end = schedule[r_date][todo_start].split(' ')[0]
+            todo_end = str.strip(todo_end, '-')
+            todo_start_in_min = convert_to_mins(todo_start)
+            todo_end_in_min = convert_to_mins(todo_end)
+            for booked in range(todo_start_in_min, todo_end_in_min):
+                booked_mins.append(booked)
+            if (len(mins_in_period) + len(booked_mins)) != len(set(mins_in_period + booked_mins)):
+                return f'Пересечение. {r_date} у вас есть планы \
+            {todo_start}{schedule[r_date][todo_start]}'
+        schedule[r_date][r_time] = r_todo
+        return 'Задача добавлена'
+
+
+def watch_schedule(r_date):
+    global schedule, notes
+
+    if r_date not in schedule.keys():
+        return 'На этот день у Вас ещё нет планов'
+    else:
+        plans = 'Ваши планы на ' + str(r_date) + ': \n '
+        time_to_mins = []
+        for time in schedule[r_date]:
+            mins_amount = convert_to_mins(time)
+            time_to_mins.append(mins_amount)
+        list.sort(time_to_mins)
+        for mins in time_to_mins:
+            h = (mins - mins % 60) // 60
+            mins = mins - h * 60
+            h = str(h)
+            mins = str(mins)
+            if len(mins) == 1:
+                mins = '0' + mins
+            res_time = h + ':' + mins
+            add_plan = res_time + schedule[r_date][res_time]
+            plans += add_plan + ' |\n '
+        plans += watch_notes(r_date)
+        return plans
+
 
 def convert_to_mins(time_moment):
     hours = int(time_moment.split(':')[0])
     minutes = int(time_moment.split(':')[1])
     converted = hours * 60 + minutes
     return converted
+
 
 def get_date(event, context):
     req_date = ''
@@ -60,7 +147,7 @@ def get_date(event, context):
             if event['request']['nlu']['entities'][i]['value']['day_is_relative'] == True:
                 user_timezone = pytz.timezone(event['meta']['timezone'])
                 days_delta = event['request']['nlu']['entities'][i]['value']['day']
-                correction = timedelta(days = days_delta)
+                correction = timedelta(days=days_delta)
                 req_date = (datetime.now(user_timezone) + correction).strftime('%d.%m')  
                 return req_date   
 
@@ -98,6 +185,7 @@ def get_time(event, context):
     req_time = hour + ':' + minute
     return req_time
 
+
 def get_timeperiod(event, context):
     time_period_index = []
 
@@ -120,6 +208,7 @@ def get_timeperiod(event, context):
 
     return time_period_start + ' - ' + time_period_end
 
+
 def get_todo(event, context):
     req_todo = ''
     
@@ -136,84 +225,6 @@ def get_todo(event, context):
             if start_datetime == 0:
                 req_todo = event['request']['nlu']['tokens'][0]
             return req_todo
-
-def clear_activity(r_date, r_time):
-    global schedule
-    if r_date not in schedule.keys():
-        return 'На этот день у вас нет планов'
-    else:
-        if r_time not in schedule[r_date].keys():
-            return 'У вас нет планов на это время'
-        else:
-            del schedule[r_date][r_time]
-
-            if len(schedule[r_date].keys()) == 0:
-                del schedule[r_date]
-                
-            return 'Задача удалена'
-
-def add_todo(r_date, r_time, r_todo):
-    global schedule
-    period_start = r_time.split(' - ')[0]
-    period_end = r_time.split(' - ')[1]
-    
-    if int(period_end.split(':')[0]) < int(period_start.split(':')[0]):
-        return 'Время конца занятия должно быть больше, чем время начала'
-    elif int(period_end.split(':')[0]) == int(period_start.split(':')[0]):
-        if int(period_end.split(':')[1]) < int(period_start.split(':')[1]):
-            return 'Время конца занятия должно быть больше, чем время начала'
-
-    r_todo = '-' + period_end + ' ' + r_todo
-    r_time = period_start
-    if r_date not in schedule.keys():
-        schedule[r_date] = {}
-        schedule[r_date][r_time] = r_todo
-        return 'Задача добавлена'
-    else:
-        mins_in_period = []
-        start_time = convert_to_mins(period_start)
-        end_time = convert_to_mins(period_end)
-        for minute in range(start_time, end_time):
-            mins_in_period.append(minute)
-
-        for todo_start in schedule[r_date]:
-            booked_mins = []
-            todo_end = schedule[r_date][todo_start].split(' ')[0]
-            todo_end = str.strip(todo_end, '-')
-            todo_start_in_min = convert_to_mins(todo_start)
-            todo_end_in_min = convert_to_mins(todo_end)
-            for booked in range(todo_start_in_min, todo_end_in_min):
-                booked_mins.append(booked)
-            if (len(mins_in_period) + len(booked_mins)) != len(set(mins_in_period + booked_mins)):
-                return f'Пересечение. {r_date} у вас есть планы \
-            {todo_start}{schedule[r_date][todo_start]}'
-        schedule[r_date][r_time] = r_todo
-        return 'Задача добавлена'
-
-def watch_schedule(r_date):
-    global schedule
-
-    if r_date not in schedule.keys():
-        return 'На этот день у Вас ещё нет планов'
-    else:
-        plans = 'Ваши планы на ' + str(r_date) + ': \n '
-        time_to_mins = []
-        for time in schedule[r_date]:
-            mins_amount = convert_to_mins(time)
-            time_to_mins.append(mins_amount)
-        list.sort(time_to_mins)
-        for mins in time_to_mins:
-            h = (mins - mins % 60) // 60
-            mins = mins - h * 60
-            h = str(h)
-            mins = str(mins)
-            if len(mins) == 1:
-                mins = '0' + mins
-            res_time = h + ':' + mins
-            add_plan = res_time + schedule[r_date][res_time]
-            plans += add_plan + ' |\n '
-            
-        return plans
 
 
 def handler(event, context):
@@ -300,14 +311,17 @@ def handler(event, context):
                 edit_count = ''
                 text = add_todo(req_date, req_timeperiod, req_todo)
 
+    elif 'посмотреть заметки' in event['request']['command']:
+        note_date = get_date(event, context)
+        text = watch_notes(note_date)
+
     elif 'удалить заметку' in event['request']['command']:
         note_date = get_date(event, context)
-        
         if note_date not in notes.keys():
             text = f'У Вас нет заметок на {note_date}'
         elif note_date == 404:
             text = 'Не расслышала дату'
-        else: 
+        else:
             text = 'Назовите номер заметки'
             delete_note = True
 
@@ -323,7 +337,7 @@ def handler(event, context):
         text = 'Укажите задачу'
         add_activity = True
 
-    elif 'посмотреть' in event['request']['command'] or 'покажи' in event['request']['command']:
+    elif 'посмотреть расписание' in event['request']['command'] or 'покажи' in event['request']['command']:
         text = 'На какой день Вы хотите посмотреть расписание?'
         check_plans = True
 
@@ -335,17 +349,21 @@ def handler(event, context):
         text = 'Назовите дату и время, на которые Вы хотите изменить занятие' 
         edit_count = 0
         edit_activity = True
-        
+
     elif 'очистить расписание' in event['request']['command']:
         schedule.clear()
         text = 'Расписание очищено!'
+
+    elif 'очистить заметки' in event['request']['command']:
+        notes.clear()
+        text = 'Заметки очищены!'
 
     elif 'пояс' in event['request']['command']:
         user_timezone = pytz.timezone(event['meta']['timezone'])
         text = datetime.now(user_timezone) 
 
     elif 'тест' in event['request']['command']:
-        text = notes['04.01']['1']
+        text = watch_notes(notes, '04.01')
 
     return {
         'version': event['version'],
