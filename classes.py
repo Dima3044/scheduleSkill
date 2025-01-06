@@ -86,7 +86,7 @@ class Requests():
                 for k in range(start_datetime):
                     if k == (start_datetime-1) and event['request']['nlu']['tokens'][k] == 'с':
                         continue
-                    req_todo += event['request']['nlu']['tokens'][k] + ' '
+                    req_todo += event['request']['original_utterance'].split(' ')[k] + ' '
                 if start_datetime == 1:
                     req_todo = event['request']['nlu']['tokens'][0]
                 return req_todo
