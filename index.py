@@ -20,11 +20,13 @@ def handler(event, context):
     if 'value' in event['state']['user'].keys():
         schedule = event['state']['user']['value']
     if event['request']['command'] == '':
-        text = 'Здравствуйте! Я навык Расписание дня. Я могу добавить задачи \
-        в Ваше расписание, показать их Вам,\
-        а также удалять и редактировать. Чем могу быть полезна?'
+        text = 'Здравствуйте! Я навык Планировщик дня. Я могу добавить задачи \
+        в ваше расписание, показать их Вам,\
+        а также удалять и редактировать. Если запутаетесь, то скажите "команды"!\
+        Чем могу быть полезна?'
     else:
         text = 'Жду Вашей команды'
+    task = event['request']['command']
 
     if add_activity == True:
         req_time = Requests.get_timeperiod(event, context)
@@ -48,8 +50,12 @@ def handler(event, context):
         add_note = False
 
     elif delete_note == True:
-        text = Notes.clear(event, context, notes, note_date)
-        delete_note = False
+        if Requests.check_words(task, 'watch'):
+            text = Notes.watch(note_date, notes)
+            task = ''
+        else:
+            text = Notes.clear(event, context, notes, note_date)
+            delete_note = False
 
     elif edit_activity == True:
         if edit_count == 0:
@@ -75,49 +81,69 @@ def handler(event, context):
                 edit_count = ''
                 text = Schedule.add(add_date, req_timeperiod, req_todo, schedule)
 
-    elif 'посмотреть заметки' in event['request']['command']:
-        note_date = Requests.get_date(event, context)
-        text = Notes.watch(note_date, notes)
-
-    elif 'удалить заметку' in event['request']['command']:
-        note_date = Requests.get_date(event, context)
-
-        if note_date not in notes.keys():
-            text = f'У Вас нет заметок на {note_date}'
-        elif note_date == 'Не расслышала дату':
-            text = note_date
+    elif Requests.check_words(task, 'watch'):
+        if 'заметк' in task:
+            note_date = Requests.get_date(event, context)
+            text = Notes.watch(note_date, notes)
+        elif Requests.check_words(task, 'schedule'):
+            req_date = Requests.get_date(event, context)
+            text = Schedule.watch(req_date, schedule, notes)
         else:
-            text = 'Назовите номер заметки'
-            delete_note = True
+            text = 'Извините, не поняла, что Вы хотите посмотреть. Повторите, пожалуйста.'
 
-    elif 'сделать заметку' in event['request']['command'] or 'создать заметку' in event['request']['command']:
-        text = 'Назовите содержимое заметки'
-        note_date = Requests.get_date(event, context)
-        if note_date != 'Не расслышала дату':
-            add_note = True
+    elif Requests.check_words(task, 'delete'):
+        if 'заметк' in task:
+            note_date = Requests.get_date(event, context)
+            if note_date == 'Не расслышала дату':
+                text = note_date
+            elif note_date not in notes.keys():
+                text = f'У Вас нет заметок на {note_date}'
+            else:
+                text = 'Назовите номер заметки'
+                delete_note = True
+        elif Requests.check_words(task, 'schedule'):
+            text = 'Назовите день и время, на которые Вы хотите удалить занятие'
+            delete_activity = True
         else:
-            text = 'Не расслышала, на какой день Вы хотите добавить заметку'
+            text = 'Извините, не поняла, что Вы хотите удалить. Повторите, пожалуйста.'
 
-    elif 'добавить' in event['request']['command'] or 'добавь' in event['request']['command'] or 'создать' in event['request']['command'] or 'создай' in event['request']['command']:
-        add_date = Requests.get_date(event, context)
-        if add_date == 'Не расслышала дату':
-            text = add_date
+    elif Requests.check_words(task, 'add'):
+        if 'заметк' in task:
+            text = 'Назовите содержимое заметки'
+            note_date = Requests.get_date(event, context)
+            if note_date != 'Не расслышала дату':
+                add_note = True
+            else:
+                text = 'Не расслышала, на какой день Вы хотите добавить заметку'   
+        elif Requests.check_words(task, 'schedule'):
+            add_date = Requests.get_date(event, context)
+            if add_date == 'Не расслышала дату':
+                text = add_date
+            else:
+                text = 'Укажите задачу и временной промежуток'
+                add_activity = True
         else:
-            text = 'Укажите задачу и временной промежуток'
-            add_activity = True
+            text = 'Извините, не поняла, что Вы хотите добавить. Повторите, пожалуйста.'
 
-    elif 'посмотреть расписание' in event['request']['command'] or 'покажи' in event['request']['command']:
-        req_date = Requests.get_date(event, context)
-        text = Schedule.watch(req_date, schedule, notes)
-
-    elif 'удалить' in event['request']['command'] or 'удали' in event['request']['command']:
-        text = 'Назовите день и время, на которые Вы хотите удалить занятие'
-        delete_activity = True
-
-    elif 'редактировать' in event['request']['command'] or 'изменить' in event['request']['command']:
+    elif Requests.check_words(task, 'edit'):
         text = 'Назовите дату и время, на которые Вы хотите изменить занятие' 
         edit_count = 0
         edit_activity = True
+
+    elif 'команды' in task:
+        text = 'Чтобы добавить запись в расписание, скажите:"Создай задачу(заметку) на ДАТА".\n\
+    Чтобы удалить заметку, скажите:"Удали заметку на ДАТА".\n\
+    Чтобы удалить задачу, скажите:"Удали задачу".\n\
+    Для просмотра расписания или заметок, скажите:"Покажи расписание(заметки) на ДАТА"\n\
+    Чтобы изменить запись, скажите:"Отредактируй"'
+
+    elif 'очистить' in event['request']['command']:
+        schedule.clear()
+        notes.clear()
+
+    elif 'прив' in event['request']['command'].lower():
+        text = 'И тебе привет'
+        
     return {
         'version': event['version'],
         'session': event['session'],
@@ -125,7 +151,7 @@ def handler(event, context):
             'text': text,
             'end_session': 'false',
         },
-        'user_state_update':{
+        'user_state_update': {
             'value': schedule,
             'notes': notes
         }

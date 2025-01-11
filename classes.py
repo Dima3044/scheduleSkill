@@ -3,6 +3,23 @@ import pytz
 
 
 class Requests():
+    def check_words(task, action):
+        if action == 'delete':
+            words = ['удали', 'убери', 'убрать']
+        elif action == 'add':
+            words = ['добав', 'созда', 'сдела']
+        elif action == 'watch':
+            words = ['посмотреть', 'узнать', 'скажи', 'покажи', 'озвучь']
+        elif action == 'schedule':
+            words = ['расписание', 'планы', 'задач']
+        elif action == 'edit':
+            words = ['редактир', 'измени']
+
+        for word in words:
+            if word in task:
+                return True
+        return False
+
     def convert_to_mins(time_moment):
         hours = int(time_moment.split(':')[0])
         minutes = int(time_moment.split(':')[1])
