@@ -21,8 +21,8 @@ def handler(event, context):
         schedule = event['state']['user']['value']
     if event['request']['command'] == '':
         text = 'Здравствуйте! Я навык Планировщик дня. Я могу добавить задачи \
-        в ваше расписание, показать их Вам,\
-        а также удалять и редактировать. Если запутаетесь, то скажите "команды"!\
+        и заметки в ваше расписание, показать их Вам,\
+        а также удалять и редактировать. Если запутаетесь, то скажите "помощь"!\
         Чем могу быть полезна?'
     else:
         text = 'Жду Вашей команды'
@@ -84,7 +84,10 @@ def handler(event, context):
     elif Requests.check_words(task, 'watch'):
         if 'заметк' in task:
             note_date = Requests.get_date(event, context)
-            text = Notes.watch(note_date, notes)
+            if note_date == 'Не расслышала дату':
+                text = note_date
+            else:
+                text = Notes.watch(note_date, notes)
         elif Requests.check_words(task, 'schedule'):
             req_date = Requests.get_date(event, context)
             text = Schedule.watch(req_date, schedule, notes)
@@ -130,19 +133,12 @@ def handler(event, context):
         edit_count = 0
         edit_activity = True
 
-    elif 'команды' in task:
+    elif 'помощь' in task or 'что ты умеешь' in task:
         text = 'Чтобы добавить запись в расписание, скажите:"Создай задачу(заметку) на ДАТА".\n\
     Чтобы удалить заметку, скажите:"Удали заметку на ДАТА".\n\
     Чтобы удалить задачу, скажите:"Удали задачу".\n\
     Для просмотра расписания или заметок, скажите:"Покажи расписание(заметки) на ДАТА"\n\
     Чтобы изменить запись, скажите:"Отредактируй"'
-
-    elif 'очистить' in event['request']['command']:
-        schedule.clear()
-        notes.clear()
-
-    elif 'прив' in event['request']['command'].lower():
-        text = 'И тебе привет'
         
     return {
         'version': event['version'],

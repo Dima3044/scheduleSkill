@@ -127,10 +127,13 @@ class Notes():
             return f'У Вас нет заметки номер {note_number} на {note_date}'
 
     def watch(note_date, notes):  # просмотр заметок
-        text = 'Ваши заметки: \n'
-        for note_number in notes[note_date]:
-            text += f'№{note_number}: {notes[note_date][note_number]} |\n'
-        return text
+        if note_date in notes.keys():
+            text = 'Ваши заметки: \n'
+            for note_number in notes[note_date]:
+                text += f'№{note_number}: {notes[note_date][note_number]} |\n'
+            return text
+        else:
+            return f'У Вас нет заметок на {note_date}'
 
     def add(event, context, notes, note_date):  # создать заметку
         if note_date not in notes.keys():
@@ -151,10 +154,10 @@ class Schedule():
 
     def clear(r_date, r_time, schedule):  # удалить задачу
         if r_date not in schedule.keys():
-            return 'На этот день у вас нет планов'
+            return 'На этот день у Вас нет планов'
         else:
             if r_time not in schedule[r_date].keys():
-                return 'У вас нет планов на это время'
+                return 'У Вас нет планов на это время'
             else:
                 del schedule[r_date][r_time]
 
